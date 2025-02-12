@@ -5,7 +5,7 @@ import re
 import time
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "https://wkeiideas.com/projects/wkeiipedia"}})
 
 WIKI_RANDOM_URL = "https://en.wikipedia.org/api/rest_v1/page/random/summary"
 WIKI_PAGEVIEWS_URL = "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{}/monthly/20240101/20250101"
