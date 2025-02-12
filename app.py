@@ -1,4 +1,4 @@
-from flask import Flask
+"""from flask import Flask
 
 app = Flask(__name__)
 
@@ -8,8 +8,8 @@ def home():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-"""from flask import Flask, jsonify, request
+"""
+from flask import Flask, jsonify, request
 import requests
 import random
 
@@ -40,4 +40,4 @@ def check_guess():
     guess = data['guess']
     if guess.lower() == title.lower():
         return jsonify({"correct": True})
-    return jsonify({"correct": False})"""
+    return jsonify({"correct": False})
