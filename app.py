@@ -90,6 +90,7 @@ def get_filtered_article(max_attempts=50):
 def get_article():
     """API route to get a filtered article."""
     article = get_filtered_article()
+    print(f"✅ Found article: {title} ({len(sentences)} sentences)")
     return jsonify(article)
 
 @app.route("/check_guess", methods=["POST"])
@@ -101,6 +102,7 @@ def check_guess():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
