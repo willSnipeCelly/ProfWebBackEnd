@@ -52,42 +52,39 @@ def mask_title_in_sentence(title, sentence):
 
     return sentence
 
-def get_filtered_article(max_attempts=30):
-    print("get filtered article")
+def get_filtered_article(max_attempts=50):
+    """Fetches a valid random article with safe retry logic."""
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get(WIKI_RANDOM_URL, timeout=5)
+            if response.status_code != 200:
+                time.sleep(0.5)
+                continue
 
-    """Fetch and filter a Wikipedia article within a limited number of attempts."""
-    attempts = 0
-    
-    while attempts < max_attempts:
-        response = requests.get(WIKI_RANDOM_URL)
-        if response.status_code != 200:
-            time.sleep(1)  # Wait and retry in case of API failure
-            attempts += 1
+            data = response.json()
+            title = data.get("title", "")
+            extract = data.get("extract", "")
+
+            # Basic checks
+            if not is_valid_title(title):
+                continue
+
+            sentences = re.split(r"(?<=\.)\s+", extract)
+            if len(sentences) < 2:
+                continue
+
+            masked_sentences = [mask_title_in_sentence(title, s) for s in sentences]
+            return {"title": title, "sentences": masked_sentences}
+
+        except requests.exceptions.RequestException:
+            # Network or timeout issue
+            time.sleep(1)
+            continue
+        except Exception as e:
+            print(f"Error parsing article attempt {attempt}: {e}")
             continue
 
-        data = response.json()
-        title = data.get("title", "")
-
-        if not is_valid_title(title):
-            attempts += 1
-            continue  # Skip invalid titles
-        
-        """views = get_page_views(title)
-        if views < 1000:
-            attempts += 1
-            continue  # Skip unpopular articles"""
-
-        sentences = re.split(r"(?<=\.)\s", data.get("extract", ""))  # Split into sentences
-        if len(sentences) < 3:
-            attempts += 1
-            continue  # Skip articles with too few sentences
-        
-        # Mask title words in sentences
-        masked_sentences = [mask_title_in_sentence(title, sentence) for sentence in sentences]
-
-        return {"title": title, "sentences": masked_sentences}
-
-    return {"error": "No suitable articles found after multiple attempts"}
+    return {"error": "No suitable articles found after multiple attempts."}
 
 @app.route("/get_article", methods=["GET"])
 def get_article():
@@ -104,6 +101,7 @@ def check_guess():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
