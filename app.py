@@ -52,7 +52,7 @@ def mask_title_in_sentence(title, sentence):
 
     return sentence
 
-def get_filtered_article(max_attempts=300):
+def get_filtered_article(max_attempts=30):
     print("get filtered article")
 
     """Fetch and filter a Wikipedia article within a limited number of attempts."""
@@ -104,5 +104,6 @@ def check_guess():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
