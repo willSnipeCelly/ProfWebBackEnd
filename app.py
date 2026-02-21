@@ -3,54 +3,35 @@ from flask_cors import CORS
 import requests
 import re
 import time
-import random
 
 app = Flask(__name__)
+# Adjust CORS to be specific if you deploy, but this is fine for dev
 CORS(app)
 
-print("here")
-
 WIKI_RANDOM_URL = "https://en.wikipedia.org/api/rest_v1/page/random/summary"
-WIKI_PAGEVIEWS_URL = "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/{}/monthly/20240101/20250101"
-
-print("now here")
 
 def is_valid_title(title):
-    print("is valid title entered")
-    """Checks if the title meets requirements (4 words max, no special characters)."""
-    if len(title.split()) > 4:
+    """Checks if the title meets requirements (4 words max, no obscure symbols)."""
+    if not title or len(title.split()) > 4:
         return False
-    if re.search(r"[^a-zA-Z0-9\s'-]", title):  # Exclude special characters
+    # Allows alphanumeric, spaces, hyphens, apostrophes, and dots
+    if re.search(r"[^a-zA-Z0-9\s'\-\.]", title):
         return False
     return True
 
-    """def get_page_views(title):
-        #Fetches the page views for a given Wikipedia article title.
-        formatted_title = title.replace(" ", "_")  # URL-friendly format
-        url = WIKI_PAGEVIEWS_URL.format(formatted_title)
-
-        try:
-            response = requests.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                if "items" in data and len(data["items"]) > 0:
-                    total_views = sum(item["views"] for item in data["items"])
-                    return total_views
-        except requests.exceptions.RequestException:
-            pass  # Fail silently and return 0 views
-
-    return 0  # Default if API fails"""
-
 def mask_title_in_sentence(title, sentence):
-    print("mask title in sentence")
     """Replaces words from the title with underscores in the sentence."""
-    title_words = title.split()
+    # Sort title words by length (longest first) to avoid partial replacement issues
+    title_words = sorted(title.split(), key=len, reverse=True)
     
+    masked_sentence = sentence
     for word in title_words:
+        if len(word) < 2: continue # Don't mask single letters like 'a'
+        # Use regex to find whole words only
         word_regex = re.compile(r'\b' + re.escape(word) + r'\b', re.IGNORECASE)
-        sentence = word_regex.sub('_' * len(word), sentence)
+        masked_sentence = word_regex.sub('_' * len(word), masked_sentence)
 
-    return sentence
+    return masked_sentence
 
 def get_filtered_article(max_attempts=50):
     """Fetches a valid random article with safe retry logic."""
@@ -58,52 +39,55 @@ def get_filtered_article(max_attempts=50):
         try:
             response = requests.get(WIKI_RANDOM_URL, timeout=5)
             if response.status_code != 200:
-                time.sleep(0.5)
                 continue
 
             data = response.json()
             title = data.get("title", "")
             extract = data.get("extract", "")
 
-            # Basic checks
-            if not is_valid_title(title):
+            if not is_valid_title(title) or not extract:
                 continue
 
-            sentences = re.split(r"(?<=\.)\s+", extract)
+            # Split sentences, but filter out empty strings
+            sentences = [s.strip() for s in re.split(r"(?<=\.)\s+", extract) if s.strip()]
+            
             if len(sentences) < 2:
                 continue
 
             masked_sentences = [mask_title_in_sentence(title, s) for s in sentences]
-            return {"title": title, "sentences": masked_sentences}
+            
+            return {
+                "title": title, 
+                "sentences": masked_sentences,
+                "original_extract": extract # Useful for debugging
+            }
 
-        except requests.exceptions.RequestException:
-            # Network or timeout issue
-            time.sleep(1)
-            continue
         except Exception as e:
-            print(f"Error parsing article attempt {attempt}: {e}")
+            print(f"Attempt {attempt} failed: {e}")
             continue
 
-    return {"error": "No suitable articles found after multiple attempts."}
+    return {"error": "No suitable articles found."}
 
 @app.route("/get_article", methods=["GET"])
 def get_article():
-    """API route to get a filtered article."""
     article = get_filtered_article()
-    print(f"✅ Found article: {title} ({len(sentences)} sentences)")
+    
+    # FIX: Corrected the print statement to use the dictionary keys
+    if "title" in article:
+        print(f"✅ Found article: {article['title']}")
+    else:
+        print("❌ Failed to find article")
+        
     return jsonify(article)
 
 @app.route("/check_guess", methods=["POST"])
 def check_guess():
-    """API route to check user's guess."""
     data = request.json
+    if not data or "guess" not in data or "title" not in data:
+        return jsonify({"error": "Missing data"}), 400
+        
     correct = data["guess"].strip().lower() == data["title"].strip().lower()
     return jsonify({"correct": correct})
 
 if __name__ == "__main__":
-    app.run(debug=True)
-
-
-
-
-
+    app.run(debug=True, port=5000)
