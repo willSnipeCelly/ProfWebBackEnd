@@ -32,8 +32,7 @@ def mask_title_in_sentence(title, sentence):
 
     return masked_sentence
 
-def get_filtered_article(max_attempts=50):
-    """Fetches a valid random article with safe retry logic."""
+def get_filtered_article(max_attempts=100): # Increased attempts
     for attempt in range(max_attempts):
         try:
             response = requests.get(WIKI_RANDOM_URL, timeout=5)
@@ -42,23 +41,29 @@ def get_filtered_article(max_attempts=50):
 
             data = response.json()
             title = data.get("title", "")
-            extract = data.get("extract", "")
+            # 'extract' is the short summary, 'description' is the one-liner
+            extract = data.get("extract", "") 
 
             if not is_valid_title(title) or not extract:
                 continue
 
-            # Split sentences, but filter out empty strings
-            sentences = [s.strip() for s in re.split(r"(?<=\.)\s+", extract) if s.strip()]
+            # Clean up the text: remove newlines and extra spaces
+            clean_extract = extract.replace('\n', ' ').strip()
             
-            if len(sentences) < 2:
+            # Split by period followed by space
+            sentences = [s.strip() + "." for s in re.split(r"\.\s+", clean_extract) if len(s.strip()) > 10]
+            
+            if len(sentences) < 1:
                 continue
 
+            # Limit to first 5 sentences so the game isn't too long
+            sentences = sentences[:5]
+            
             masked_sentences = [mask_title_in_sentence(title, s) for s in sentences]
             
             return {
                 "title": title, 
-                "sentences": masked_sentences,
-                "original_extract": extract # Useful for debugging
+                "sentences": masked_sentences
             }
 
         except Exception as e:
