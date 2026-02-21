@@ -11,11 +11,10 @@ CORS(app)
 WIKI_RANDOM_URL = "https://en.wikipedia.org/api/rest_v1/page/random/summary"
 
 def is_valid_title(title):
-    """Checks if the title meets requirements (4 words max, no obscure symbols)."""
+    """Keep it simple: Max 4 words, and ignore 'List of...' pages."""
     if not title or len(title.split()) > 4:
         return False
-    # Allows alphanumeric, spaces, hyphens, apostrophes, and dots
-    if re.search(r"[^a-zA-Z0-9\s'\-\.]", title):
+    if title.startswith("List of"): # 'List of' articles aren't fun for this game
         return False
     return True
 
