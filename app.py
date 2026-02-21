@@ -32,35 +32,55 @@ def mask_title_in_sentence(title, sentence):
 
     return masked_sentence
 
+def is_valid_title(title):
+    # Allow almost everything, just avoid internal Wikipedia pages
+    if not title or ":" in title: # Rejects 'Category:Science' or 'File:Image.jpg'
+        return False
+    # Relax word count to 6 words
+    if len(title.split()) > 6:
+        return False
+    return True
+
 def get_filtered_article(max_attempts=50):
-    print(f"--- Starting Search for Article ---")
     for attempt in range(max_attempts):
         try:
-            response = requests.get(WIKI_RANDOM_URL, timeout=5)
+            # We add a User-Agent to prevent Wikipedia from thinking we are a bot
+            headers = {'User-Agent': 'WikiGuessGame/1.0'}
+            response = requests.get(WIKI_RANDOM_URL, headers=headers, timeout=5)
+            
+            if response.status_code != 200:
+                continue
+
             data = response.json()
             title = data.get("title", "")
             extract = data.get("extract", "")
 
-            # DEBUG PRINT: See what we are getting
-            print(f"Attempt {attempt}: Found '{title}'")
+            # LOGGING: See exactly what is happening in Render Logs
+            print(f"Checking: {title}")
 
             if not is_valid_title(title):
-                print(f"   REJECTED: Title too long or has special chars")
                 continue
 
-            if not extract or len(extract) < 100:
-                print(f"   REJECTED: Extract too short")
+            if not extract or len(extract) < 50: # Very low bar for length
                 continue
 
-            # If we got here, it passed!
-            sentences = [s.strip() + "." for s in re.split(r"\.\s+", extract) if len(s.strip()) > 5]
-            masked_sentences = [mask_title_in_sentence(title, s) for s in sentences]
+            # CLEANUP: Remove parentheses and citations like [1] or (born 1980)
+            clean_extract = re.sub(r'\([^)]*\)', '', extract)
+            clean_extract = re.sub(r'\[[0-9]*\]', '', clean_extract)
             
-            print(f"✅ SUCCESS: Selected '{title}'")
+            # SPLITTING: Split into sentences
+            sentences = [s.strip() + "." for s in re.split(r"\.\s+", clean_extract) if len(s.strip()) > 5]
+            
+            if not sentences:
+                continue
+
+            # MASKING: Only use the first 4 sentences
+            masked_sentences = [mask_title_in_sentence(title, s) for s in sentences[:4]]
+            
             return {"title": title, "sentences": masked_sentences}
 
         except Exception as e:
-            print(f"   ERROR on attempt {attempt}: {e}")
+            print(f"Error on attempt {attempt}: {e}")
             continue
 
     return {"error": "No suitable articles found after 50 tries."}
