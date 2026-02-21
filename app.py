@@ -32,46 +32,39 @@ def mask_title_in_sentence(title, sentence):
 
     return masked_sentence
 
-def get_filtered_article(max_attempts=100): # Increased attempts
+def get_filtered_article(max_attempts=50):
+    print(f"--- Starting Search for Article ---")
     for attempt in range(max_attempts):
         try:
             response = requests.get(WIKI_RANDOM_URL, timeout=5)
-            if response.status_code != 200:
-                continue
-
             data = response.json()
             title = data.get("title", "")
-            # 'extract' is the short summary, 'description' is the one-liner
-            extract = data.get("extract", "") 
+            extract = data.get("extract", "")
 
-            if not is_valid_title(title) or not extract:
+            # DEBUG PRINT: See what we are getting
+            print(f"Attempt {attempt}: Found '{title}'")
+
+            if not is_valid_title(title):
+                print(f"   REJECTED: Title too long or has special chars")
                 continue
 
-            # Clean up the text: remove newlines and extra spaces
-            clean_extract = extract.replace('\n', ' ').strip()
-            
-            # Split by period followed by space
-            sentences = [s.strip() + "." for s in re.split(r"\.\s+", clean_extract) if len(s.strip()) > 10]
-            
-            if len(sentences) < 1:
+            if not extract or len(extract) < 100:
+                print(f"   REJECTED: Extract too short")
                 continue
 
-            # Limit to first 5 sentences so the game isn't too long
-            sentences = sentences[:5]
-            
+            # If we got here, it passed!
+            sentences = [s.strip() + "." for s in re.split(r"\.\s+", extract) if len(s.strip()) > 5]
             masked_sentences = [mask_title_in_sentence(title, s) for s in sentences]
             
-            return {
-                "title": title, 
-                "sentences": masked_sentences
-            }
+            print(f"✅ SUCCESS: Selected '{title}'")
+            return {"title": title, "sentences": masked_sentences}
 
         except Exception as e:
-            print(f"Attempt {attempt} failed: {e}")
+            print(f"   ERROR on attempt {attempt}: {e}")
             continue
 
-    return {"error": "No suitable articles found."}
-
+    return {"error": "No suitable articles found after 50 tries."}
+    
 @app.route("/get_article", methods=["GET"])
 def get_article():
     article = get_filtered_article()
